@@ -80,6 +80,13 @@ impl OutputHandle<'_> {
             Self::FmtWrite(handle) => handle.write_fmt(args).map_err(Into::into),
         }
     }
+
+    pub fn flush(&mut self) -> Result<()> {
+        match self {
+            Self::IoWrite(handle) => handle.flush().map_err(Into::into),
+            Self::FmtWrite(_) => Ok(()),
+        }
+    }
 }
 
 pub(crate) trait Printer {

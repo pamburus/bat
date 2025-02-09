@@ -1,11 +1,11 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, BufWriter, Write};
 
 use crate::assets::HighlightingAssets;
 use crate::config::{Config, VisibleLines};
 #[cfg(feature = "git")]
 use crate::diff::{get_git_diff, LineChanges};
 use crate::error::*;
-use crate::input::{Input, InputReader, OpenedInput};
+use crate::input::{Input, InputReader, OpenedInput, ReadLineResult};
 #[cfg(feature = "lessopen")]
 use crate::lessopen::LessOpenPreprocessor;
 #[cfg(feature = "git")]
@@ -88,10 +88,15 @@ impl Controller<'_> {
             clircle::Identifier::stdout()
         };
 
+        let mut buf_writer;
         let mut writer = match output_buffer {
             Some(buf) => OutputHandle::FmtWrite(buf),
-            None => OutputHandle::IoWrite(output_type.handle()?),
+            None => {
+                buf_writer = BufWriter::new(output_type.handle()?);
+                OutputHandle::IoWrite(&mut buf_writer)
+            }
         };
+
         let mut no_errors: bool = true;
         let stderr = io::stderr();
 
@@ -249,7 +254,16 @@ impl Controller<'_> {
 
         let style_snip = self.config.style_components.snip();
 
-        while reader.read_line(&mut line_buffer)? {
+        loop {
+            match reader.read_line_peek(&mut line_buffer)? {
+                ReadLineResult::Ready => {}
+                ReadLineResult::NotReady => {
+                    writer.flush()?;
+                    continue;
+                }
+                ReadLineResult::Eof => break,
+            }
+
             match line_ranges.check(line_number) {
                 RangeCheckResult::BeforeOrBetweenRanges => {
                     // Call the printer in case we need to call the syntax highlighter

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use clircle::{Clircle, Identifier};
 use content_inspector::{self, ContentType};
+use memchr::memchr;
 
 use crate::error::*;
 
@@ -291,6 +292,31 @@ impl<'a> InputReader<'a> {
 
         Ok(res)
     }
+
+    pub(crate) fn read_line_peek(&mut self, buf: &mut Vec<u8>) -> io::Result<ReadLineResult> {
+        let inner_buf = self.inner.fill_buf()?;
+        if inner_buf.is_empty() {
+            return Ok(ReadLineResult::Eof);
+        }
+
+        let i = memchr(b'\n', inner_buf);
+        if let Some(i) = i {
+            buf.extend_from_slice(&inner_buf[..=i]);
+            self.inner.consume(i + 1);
+            Ok(ReadLineResult::Ready)
+        } else {
+            buf.extend_from_slice(inner_buf);
+            let n = inner_buf.len();
+            self.inner.consume(n);
+            Ok(ReadLineResult::NotReady)
+        }
+    }
+}
+
+pub(crate) enum ReadLineResult {
+    Ready,
+    NotReady,
+    Eof,
 }
 
 #[test]

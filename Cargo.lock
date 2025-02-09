@@ -134,6 +134,7 @@ dependencies = [
  "home",
  "indexmap",
  "itertools",
+ "memchr",
  "nix",
  "nu-ansi-term",
  "once_cell",
